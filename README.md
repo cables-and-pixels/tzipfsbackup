@@ -6,5 +6,5 @@ and [ipget](https://dist.ipfs.tech/#ipget)
 
 Usage:
 ```
-tzipfsbackup.js --creator=tz1aaa --creator=tz1bbb
+node tzipfsbackup.js --creator=tz1xxx --creator=tz1yyy
 ```

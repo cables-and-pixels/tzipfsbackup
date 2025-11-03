@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-import fs from 'fs';
-import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
 import fetch from 'node-fetch';
+import fs from 'fs';
 import yaml from 'js-yaml';
+import yargs from 'yargs';
 import { execSync } from 'child_process';
+import { hideBin } from 'yargs/helpers';
 
 const argv = yargs(hideBin(process.argv))
   .usage(
@@ -19,11 +19,19 @@ const argv = yargs(hideBin(process.argv))
       });
     }
   )
+  .default({
+    backupDir: 'IPFS',
+  })
   .help()
   .version(false)
   .example([
     ['$0 --creator=tz1xxxx --creator=tz1yyyy'],
   ]).argv;
+
+if (!fs.existsSync(argv.backupDir)) {
+  fs.mkdirSync(argv.backupDir);
+}
+process.chdir(argv.backupDir);
 
 const OBJKT_ENDPOINT = 'https://data.objkt.com/v3/graphql';
 
