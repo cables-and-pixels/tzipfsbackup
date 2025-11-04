@@ -144,12 +144,17 @@ catch {
         const hash = url.host;
         if (!(hash in hashes)) {
           hashes[hash] = 1;
-          console.log(`  ${hash}`);
-          try {
-            const output = execSync(`ipget ${hash}`);
+          if (fs.existsSync(hash)) {
+            console.log(`  ${hash} (skipping)`)
           }
-          catch(e) {
-            console.log(e);
+          else {
+            console.log(`  ${hash}`);
+            try {
+              const output = execSync(`ipget ${hash}`);
+            }
+            catch(e) {
+              console.log(e);
+            }
           }
         }
       }
