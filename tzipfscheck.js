@@ -8,12 +8,12 @@ import yaml from 'js-yaml';
 
 const argv = yargs(hideBin(process.argv))
   .default({
-    backupDir: 'IPFS',
+    localBackup: 'IPFS',
   })
   .help()
   .argv
 
-const index_file = `${argv.backupDir}/index.yaml`;
+const index_file = `${argv.localBackup}/index.yaml`;
 
 try {
   const statuses = {};
@@ -34,7 +34,7 @@ try {
           status = statuses[hash];
         }
         else {
-          const f = `${argv.backupDir}/${hash}`;
+          const f = `${argv.localBackup}/${hash}`;
           const exists = fs.existsSync(f);
           if (exists) {
             const o = execSync(
