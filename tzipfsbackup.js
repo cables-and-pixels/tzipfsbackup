@@ -8,25 +8,20 @@ import { execSync } from 'child_process';
 import { hideBin } from 'yargs/helpers';
 
 const argv = yargs(hideBin(process.argv))
-  .usage(
-    '$0 [options]',
-    'Backup Tezos tokens IPFS data',
-    (yargs) => {
-      yargs.option('creator', {
-        type: 'array',
-        describe: 'creator tezos address',
-        demandOption: true,
-      });
-    }
-  )
+  .option('creator', {
+    alias: 'c',
+    describe: 'Creator tezos address',
+    type: 'array',
+    demandOption: true,
+  })
   .default({
     backupDir: 'IPFS',
   })
   .help()
-  .version(false)
   .example([
     ['$0 --creator=tz1xxxx --creator=tz1yyyy'],
-  ]).argv;
+  ])
+  .argv
 
 if (!fs.existsSync(argv.backupDir)) {
   fs.mkdirSync(argv.backupDir);
@@ -88,25 +83,31 @@ catch {
 
 (async () => {
 
-  process.stdout.write('Getting token data');
+  console.log('Getting tokens data...');
 
   let tokens = [];
 
   for (let addr of argv.creator) {
     let pk = 0;
+    let addrTokens = [];
     while (true) {
       const page = await getCreatorTokens(addr, pk);
       if (page.length > 0) {
-        process.stdout.write('...');
-        tokens.push(...page);
-        pk = tokens.at(-1).pk;
+        addrTokens.push(...page);
+        pk = addrTokens.at(-1).pk;
       }
       else {
         break;
       }
     }
+    if (addrTokens.length === 0) {
+      console.warn(`Warning: no token created by ${addr}`);
+    }
+    else {
+      tokens.push(...addrTokens);
+    }
   }
-  console.log(' OK');
+  console.log('OK');
 
   const index = [];
   for (let t of tokens) {
