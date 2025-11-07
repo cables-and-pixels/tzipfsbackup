@@ -7,6 +7,15 @@ import yargs from 'yargs';
 import { execSync } from 'child_process';
 import { hideBin } from 'yargs/helpers';
 
+const defaultFields = [
+  'artifact_uri',
+  'display_uri',
+  'thumbnail_uri',
+  'metadata',
+];
+
+let fields;
+
 const argv = yargs(hideBin(process.argv))
   .option('creator', {
     alias: 'c',
@@ -36,7 +45,16 @@ const argv = yargs(hideBin(process.argv))
       return v === true ? 'IPFS_CIDs.txt' : v;
     },
   })
+  .option('fields', {
+    alias: 'f',
+    describe: 'Fields to backup',
+    default: defaultFields.join(','),
+  })
   .check((argv) => {
+    fields = argv.fields.split(/,\s*/).filter(k => defaultFields.includes(k));
+    if (fields.length === 0) {
+      throw new Error('Error: select at least one IPFS field');
+    }
     if (argv.localBackup || argv.cidList) {
       if (!argv.creator && !argv.holder) {
         throw new Error('Error: select at least one creator/holder.');
@@ -60,8 +78,7 @@ const argv = yargs(hideBin(process.argv))
 const OBJKT_ENDPOINT = 'https://data.objkt.com/v3/graphql';
 
 async function getTokensPage(where, pk) {
-  const query = `
-query GetTokens {
+  const query = `query GetTokens {
   token(
     where: {
       ${where},
@@ -72,10 +89,7 @@ query GetTokens {
   ) {
     name
     fa { name }
-    artifact_uri
-    display_uri
-    thumbnail_uri
-    metadata
+    ${fields.join(' ')}
     pk
   }
 }`;
@@ -166,12 +180,7 @@ async function getTokenData(creators, holders) {
       name: t.name,
       type: t.fa.name,
     };
-    for (let k of [
-      'artifact_uri',
-      'display_uri',
-      'thumbnail_uri',
-      'metadata',
-    ]) {
+    for (let k of fields) {
       if (t[k]?.startsWith('ipfs:')) {
         o[k] = t[k];
       }
@@ -203,12 +212,7 @@ function localBackup(index, dirname) {
 
   for (let o of index) {
     console.log(`${o.name} [${o.type}]`);
-    for (let k of [
-      'artifact_uri',
-      'display_uri',
-      'thumbnail_uri',
-      'metadata',
-    ]) {
+    for (let k of fields) {
       if (k in o) {
         const url = new URL(o[k]);
         const hash = url.host;
@@ -248,12 +252,7 @@ function checkLocalBackup(dirname) {
     const index = yaml.load(fs.readFileSync(index_file, 'utf8'));
     for (let o of index) {
       console.log(`${o.name} [${o.type}]`);
-      for (let k of [
-        'artifact_uri',
-        'display_uri',
-        'thumbnail_uri',
-        'metadata',
-      ]) {
+      for (let k of fields) {
         if (k in o) {
           const url = new URL(o[k]);
           const hash = url.host;
@@ -300,12 +299,7 @@ function cidList(index, filename) {
   let list = '';
   const hashes = {};
   for (let o of index) {
-    for (let k of [
-      'artifact_uri',
-      'display_uri',
-      'thumbnail_uri',
-      'metadata',
-    ]) {
+    for (let k of fields) {
       if (k in o) {
         const url = new URL(o[k]);
         const hash = url.host;
