@@ -24,6 +24,12 @@ const argv = yargs(hideBin(process.argv))
       return v === true ? 'IPFS' : v;
     },
   })
+  .option('checkLocalBackup', {
+    describe: 'Check a local backup',
+    coerce: (v) => {
+      return v === true ? 'IPFS' : v;
+    },
+  })
   .option('cidList', {
     describe: 'Build a CID list file',
     coerce: (v) => {
@@ -31,13 +37,16 @@ const argv = yargs(hideBin(process.argv))
     },
   })
   .check((argv) => {
-    if (!argv.creator && !argv.holder) {
-      throw new Error('Error: select at least one creator/holder');
+    if (argv.localBackup || argv.cidList) {
+      if (!argv.creator && !argv.holder) {
+        throw new Error('Error: select at least one creator/holder.');
+      }
+      return true;
     }
-    if (!argv.localBackup && !argv.cidList) {
-      throw new Error('Error: select --localBackup or --cidList');
+    if (argv.checkLocalBackup) {
+      return true;
     }
-    return true;
+    throw new Error('Error: nothing to do.');
   })
   .version(false)
   .help()
@@ -59,6 +68,7 @@ query GetTokens {
       pk: { _gt: ${pk} }
     }
     order_by: { pk: asc }
+    limit: 500
   ) {
     name
     fa { name }
@@ -94,6 +104,7 @@ async function getTokens(where) {
   while (true) {
     const page = await getTokensPage(where, pk);
     if (page.length > 0) {
+      console.log(page.length)
       tokens.push(...page);
       pk = tokens.at(-1).pk;
     }
@@ -112,88 +123,13 @@ async function getHolderTokens(addr) {
   return getTokens(`holders: { holder_address: { _eq: "${addr}" }, quantity: { _gt: 0 } }`);
 }
 
-function localBackup(index) {
-  try {
-    execSync('command -v ipget', { stdio: 'ignore' });
-  }
-  catch {
-    console.log('Error: ipget command not found.');
-    console.log('Please install ipget (see https://dist.ipfs.tech/#ipget)');
-    process.exit(1);
-  }
-
-  if (!fs.existsSync(argv.localBackup)) {
-    fs.mkdirSync(argv.localBackup);
-  }
-  process.chdir(argv.localBackup);
-
-  fs.writeFileSync('index.yaml', yaml.dump(index), 'utf8');
-
-  const hashes = {};
-
-  for (let o of index) {
-    console.log(`${o.name} [${o.type}]`);
-    for (let k of [
-      'artifact_uri',
-      'display_uri',
-      'thumbnail_uri',
-      'metadata',
-    ]) {
-      if (k in o) {
-        const url = new URL(o[k]);
-        const hash = url.host;
-        if (!(hash in hashes)) {
-          hashes[hash] = true;
-          if (fs.existsSync(hash)) {
-            console.log(`  ${hash} (skipping)`)
-          }
-          else {
-            console.log(`  ${hash}`);
-            try {
-              const output = execSync(`ipget ${hash}`);
-            }
-            catch(e) {
-              console.log(e);
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-function cidList(index) {
-  let list = '';
-  const hashes = {};
-  for (let o of index) {
-    for (let k of [
-      'artifact_uri',
-      'display_uri',
-      'thumbnail_uri',
-      'metadata',
-    ]) {
-      if (k in o) {
-        const url = new URL(o[k]);
-        const hash = url.host;
-        if (!(hash in hashes)) {
-          hashes[hash] = true;
-          list += hash + '\n';
-        }
-      }
-    }
-  }
-  fs.writeFileSync(argv.cidList, list, 'utf8');
-  console.log(`Wrote ${argv.cidList}.`);
-}
-
-(async () => {
-
+async function getTokenData(creators, holders) {
   console.log('Getting token data...');
 
   const tokens = [];
 
-  if (argv.creator) {
-    for (let addr of argv.creator) {
+  if (creators) {
+    for (let addr of creators) {
       const addrTokens = await getCreatorTokens(addr);
       if (addrTokens.length === 0) {
         console.warn(`Warning: no token created by ${addr}`);
@@ -204,8 +140,8 @@ function cidList(index) {
     }
   }
 
-  if (argv.holder) {
-    for (let addr of argv.holder) {
+  if (holders) {
+    for (let addr of holders) {
       const addrTokens = await getHolderTokens(addr);
       if (addrTokens.length === 0) {
         console.warn(`Warning: no token holded by ${addr}`);
@@ -243,13 +179,161 @@ function cidList(index) {
     index.push(o);
   }
 
+  return index;
+}
+
+function localBackup(index, dirname) {
+  try {
+    execSync('command -v ipget', { stdio: 'ignore' });
+  }
+  catch {
+    console.log('Error: ipget command not found.');
+    console.log('Please install ipget (see https://dist.ipfs.tech/#ipget)');
+    process.exit(1);
+  }
+
+  if (!fs.existsSync(dirname)) {
+    fs.mkdirSync(dirname);
+  }
+  process.chdir(dirname);
+
+  fs.writeFileSync('index.yaml', yaml.dump(index), 'utf8');
+
+  const hashes = {};
+
+  for (let o of index) {
+    console.log(`${o.name} [${o.type}]`);
+    for (let k of [
+      'artifact_uri',
+      'display_uri',
+      'thumbnail_uri',
+      'metadata',
+    ]) {
+      if (k in o) {
+        const url = new URL(o[k]);
+        const hash = url.host;
+        if (!(hash in hashes)) {
+          hashes[hash] = true;
+          if (fs.existsSync(hash)) {
+            console.log(`  ${hash} (skipping)`)
+          }
+          else {
+            console.log(`  ${hash}`);
+            try {
+              const output = execSync(`ipget ${hash}`);
+            }
+            catch(e) {
+              console.log(e);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+function checkLocalBackup(dirname) {
+  try {
+    execSync('command -v ipget', { stdio: 'ignore' });
+  }
+  catch {
+    console.log('Error: ipfs command not found.');
+    console.log('Please install ipfs (see https://dist.ipfs.tech/#kubo)');
+    process.exit(1);
+  }
+
+  try {
+    const index_file = `${dirname}/index.yaml`;
+    const statuses = {};
+    const index = yaml.load(fs.readFileSync(index_file, 'utf8'));
+    for (let o of index) {
+      console.log(`${o.name} [${o.type}]`);
+      for (let k of [
+        'artifact_uri',
+        'display_uri',
+        'thumbnail_uri',
+        'metadata',
+      ]) {
+        if (k in o) {
+          const url = new URL(o[k]);
+          const hash = url.host;
+          let status = true;
+          if (hash in statuses) {
+            status = statuses[hash];
+          }
+          else {
+            const f = `${dirname}/${hash}`;
+            const exists = fs.existsSync(f);
+            if (exists) {
+              const o = execSync(
+                `ipfs add -r --progress=false --only-hash ${f}`,
+                { encoding: 'utf-8' }
+              );
+              for (let line of o.split('\n')) {
+                const match = line.match(/^added (\S+) (\S+)$/);
+                if (match && match[1] === hash) {
+                  if (match[2] !== match[1]) {
+                    console.log('???', match[2], match[1]);
+                    status = false;
+                  }
+                }
+              }
+            }
+            else {
+              status = false;
+            }
+            statuses[hash] = status;
+          }
+          const xstatus = status ? '✅' : '❌';
+          console.log(`  ${xstatus} ${k}: ${hash}`);
+        }
+      }
+    }
+  }
+  catch (e) {
+    console.error(e);
+    process.exit(1);
+  }
+}
+
+function cidList(index, filename) {
+  let list = '';
+  const hashes = {};
+  for (let o of index) {
+    for (let k of [
+      'artifact_uri',
+      'display_uri',
+      'thumbnail_uri',
+      'metadata',
+    ]) {
+      if (k in o) {
+        const url = new URL(o[k]);
+        const hash = url.host;
+        if (!(hash in hashes)) {
+          hashes[hash] = true;
+          list += hash + '\n';
+        }
+      }
+    }
+  }
+  fs.writeFileSync(filename, list, 'utf8');
+  console.log(`Wrote ${filename}.`);
+}
+
+(async () => {
+
   if (argv.cidList) {
-    cidList(index);
+    const tokens = await getTokenData(argv.creator, argv.holder);
+    cidList(tokens, argv.cidList);
   }
 
   if (argv.localBackup) {
-    localBackup(index);
+    const tokens = await getTokenData(argv.creator, argv.holder);
+    localBackup(tokens, argv.localBackup);
+  }
+
+  if (argv.checkLocalBackup) {
+    checkLocalBackup(argv.checkLocalBackup);
   }
 
 })();
-
