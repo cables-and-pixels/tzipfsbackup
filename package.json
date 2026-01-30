@@ -1,14 +1,9 @@
 {
-  "name": "ipfsave",
-  "version": "1.0.0",
-  "description": "",
+  "name": "tzipfsbackup",
   "type": "module",
-  "main": "ipfsave.js",
-  "license": "ISC",
-  "author": "",
+  "main": "tzipfsbackup.js",
   "dependencies": {
     "js-yaml": "^4.1.0",
-    "node-fetch": "^3.3.2",
     "yargs": "^18.0.0"
   }
 }

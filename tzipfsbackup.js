@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import fetch from 'node-fetch';
 import fs from 'fs';
 import yaml from 'js-yaml';
 import yargs from 'yargs';
@@ -238,7 +237,7 @@ function localBackup(index, dirname) {
 
 function checkLocalBackup(dirname) {
   try {
-    execSync('command -v ipget', { stdio: 'ignore' });
+    execSync('command -v ipfs', { stdio: 'ignore' });
   }
   catch {
     console.log('Error: ipfs command not found.');
